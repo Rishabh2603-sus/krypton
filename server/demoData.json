@@ -1,0 +1,32 @@
+{
+  "ravi": {
+    "name": "Ravi",
+    "occupation": "Delivery Partner",
+    "incomeType": "irregular",
+    "income": [19000, 27000, 22000, 34000, 17000, 29000],
+    "currentSavings": 30000,
+    "essentialExpenses": 21000,
+    "monthlyDebtPayment": 3000,
+    "financialGoal": "emergency_fund"
+  },
+  "priya": {
+    "name": "Priya",
+    "occupation": "Freelance Designer",
+    "incomeType": "irregular",
+    "income": [25000, 27000, 26000, 28000, 25500, 27500],
+    "currentSavings": 60000,
+    "essentialExpenses": 18000,
+    "monthlyDebtPayment": 2000,
+    "financialGoal": "investment"
+  },
+  "arjun": {
+    "name": "Arjun",
+    "occupation": "Auto Rickshaw Driver",
+    "incomeType": "irregular",
+    "income": [14000, 18000, 16000, 22000, 15000, 19000],
+    "currentSavings": 8000,
+    "essentialExpenses": 20000,
+    "monthlyDebtPayment": 6000,
+    "financialGoal": "debt_repayment"
+  }
+}
