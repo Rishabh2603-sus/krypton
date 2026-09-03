@@ -1,6 +1,5 @@
-
 import express from 'express';
-import { getUser } from '../controllers/userController.js';
+import { getUser, addTransaction } from '../controllers/userController.js';
 import { analyzeFinances, simulateFinances } from '../controllers/financeController.js';
 import { getAdvice, chatWithAI } from '../controllers/aiController.js';
 
@@ -11,6 +10,7 @@ router.get('/health', (req, res) => {
 });
 
 router.get('/demo/:userId', getUser);
+router.post('/user/:userId/transaction', addTransaction);
 router.post('/analyze', analyzeFinances);
 router.post('/simulate', simulateFinances);
 router.post('/ai/advice', getAdvice);

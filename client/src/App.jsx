@@ -13,6 +13,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  PieChart,
+  Pie
 } from "recharts";
 import ReactMarkdown from "react-markdown";
 import { api } from "./api";
@@ -68,7 +70,7 @@ const getStatusBadge = (band) => {
 /* ══════════════════════════════════════════════════════════════════
    SIDEBAR COMPONENT
 ══════════════════════════════════════════════════════════════════ */
-function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
+function Sidebar({ activeUser, onUserChange, onNavClick, activeSection, isMobileMenuOpen, setIsMobileMenuOpen }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const navItems = [
@@ -86,20 +88,26 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
   ];
 
   return (
-    <aside
-      style={{
-        width: isCollapsed ? 72 : 230,
-        flexShrink: 0,
-        borderRight: "1px solid var(--border-subtle)",
-        padding: isCollapsed ? "24px 8px" : "24px 16px",
-        background: "#FAF9F6",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease",
-        overflow: "hidden"
-      }}
-    >
+    <>
+      <div 
+        className={`sidebar-overlay ${isMobileMenuOpen ? 'open' : ''}`} 
+        onClick={() => setIsMobileMenuOpen(false)} 
+      />
+      <aside
+        className={`mobile-sidebar ${isMobileMenuOpen ? 'open' : ''}`}
+        style={{
+          width: isCollapsed ? 72 : 230,
+          flexShrink: 0,
+          borderRight: "1px solid var(--border-subtle)",
+          padding: isCollapsed ? "24px 8px" : "24px 16px",
+          background: "#FAF9F6",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease",
+          overflow: "hidden"
+        }}
+      >
       <div>
         {/* Brand & Toggle */}
         <div style={{ padding: isCollapsed ? "0 4px 24px" : "0 8px 24px", display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between" }}>
@@ -229,6 +237,7 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
         </div>
       </div>
     </aside>
+    </>
   );
 }
 
@@ -241,6 +250,13 @@ export default function App() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [txAmount, setTxAmount] = useState("");
+  const [txType, setTxType] = useState("income");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Simulator State
   const [simPercent, setSimPercent] = useState(-20);
@@ -334,6 +350,23 @@ export default function App() {
     setIsTyping(false);
   };
 
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    if (!txAmount || isNaN(txAmount)) return;
+    setIsSubmitting(true);
+    try {
+      const res = await api.addTransaction(activeUserId, { amount: Number(txAmount), type: txType });
+      if (res.success) {
+        setIsModalOpen(false);
+        setTxAmount("");
+        loadUser(activeUserId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setIsSubmitting(false);
+  };
+
   const targetSafeToSpend = analysis?.safeToSpend?.amount || 0;
   const targetSavings = user?.currentSavings || 0;
   const targetAvgIncome = analysis?.incomeAnalysis?.average || 0;
@@ -388,37 +421,50 @@ export default function App() {
   ]);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-app)" }}>
+    <div style={{ display: "flex", height: "100vh", background: "var(--bg-app)" }}>
       {/* ── Left Sidebar ── */}
       <Sidebar
         activeUser={activeUserId}
         onUserChange={setActiveUserId}
         onNavClick={setActiveSection}
         activeSection={activeSection}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
       {/* ── Main View Container (Balanced, well-filled layout) ── */}
-      <main style={{ flex: 1, padding: "28px 40px", maxWidth: 1240, width: "100%", margin: "0 auto", overflowY: "auto", height: "100vh" }}>
+      <main style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
         
-        {/* Top Header Bar */}
+        {/* Top Header */}
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid var(--border-subtle)" }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>
-              {user.name}
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
-              {user.occupation} · {user.incomeType} income
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="btn-interactive"
+              style={{ background: "transparent", border: "1px solid var(--border-light)", color: "var(--text-primary)", width: 32, height: 32, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>
+                {user.name}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
+                {user.occupation} · {user.incomeType} income
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, background: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}` }}>
+            <span className="desktop-only" style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, background: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}` }}>
               ● {statusBadge.label} ({resilience.score}/100)
             </span>
             <button
+              onClick={() => setIsModalOpen(true)}
               className="btn-interactive"
-              style={{ background: "transparent", border: "1px solid var(--border-light)", color: "var(--text-primary)", width: 32, height: 32, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+              style={{ background: "#191918", color: "#FFFFFF", padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600, border: "none", display: "flex", alignItems: "center", gap: 6 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span className="desktop-only">Add Entry</span>
             </button>
           </div>
         </header>
@@ -427,10 +473,10 @@ export default function App() {
             1. OVERVIEW (Dashboard)
         ═══════════════════════════════════════════════════════════ */}
         {activeSection === "dashboard" && (
-          <div className="view-fade-in" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="view-fade-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             
             {/* 4 Essential Metrics */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div className="metrics-grid">
               <div className="minimal-card" style={{ padding: "18px 20px" }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>Safe to Spend</div>
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(animatedSafeToSpend)}</div>
@@ -458,8 +504,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Row 2: 2 Balanced Side-by-Side Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18 }}>
+            {/* Middle Row: Chart & Breakdown */}
+            <div className="charts-grid">
               {/* Income Line Chart */}
               <div className="minimal-card" style={{ padding: 22 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -672,6 +718,38 @@ export default function App() {
                 <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, marginTop: 10, display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
                   <span>Fixed Load: <strong>{((monthlyObligations / avgIncome) * 100).toFixed(0)}%</strong></span>
                   <span>Surplus Rate: <strong style={{ color: "var(--accent-green)" }}>{((Math.max(0, netSurplus) / avgIncome) * 100).toFixed(0)}%</strong></span>
+                </div>
+                
+                {/* Expense Breakdown Donut Chart */}
+                <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 16, marginTop: 16 }}>
+                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8, textAlign: "center" }}>
+                      Expense Breakdown
+                   </div>
+                   <div style={{ height: 160 }}>
+                     <ResponsiveContainer width="100%" height="100%">
+                       <PieChart>
+                         <Pie
+                           data={[
+                             { name: "Housing", value: user.essentialExpenses * 0.4 },
+                             { name: "Food", value: user.essentialExpenses * 0.3 },
+                             { name: "Transport", value: user.essentialExpenses * 0.2 },
+                             { name: "Utilities", value: user.essentialExpenses * 0.1 }
+                           ]}
+                           innerRadius={45}
+                           outerRadius={70}
+                           paddingAngle={4}
+                           dataKey="value"
+                           stroke="none"
+                         >
+                           <Cell fill="#191918" />
+                           <Cell fill="#4A4A4A" />
+                           <Cell fill="#7E7E7E" />
+                           <Cell fill="#B0B0B0" />
+                         </Pie>
+                         <Tooltip formatter={(value) => inr(value)} contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }} />
+                       </PieChart>
+                     </ResponsiveContainer>
+                   </div>
                 </div>
               </div>
             </div>
@@ -1003,6 +1081,47 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Transaction Modal */}
+      {isModalOpen && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div className="minimal-card view-fade-in" style={{ width: "100%", maxWidth: 400, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Record Transaction</div>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            <form onSubmit={handleAddTransaction} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Transaction Type</label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button type="button" onClick={() => setTxType("income")} style={{ flex: 1, padding: "10px", borderRadius: 6, border: txType === "income" ? "1px solid var(--accent-green)" : "1px solid var(--border-subtle)", background: txType === "income" ? "var(--accent-green-bg)" : "transparent", color: txType === "income" ? "var(--accent-green)" : "var(--text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                    Income
+                  </button>
+                  <button type="button" onClick={() => setTxType("expense")} style={{ flex: 1, padding: "10px", borderRadius: 6, border: txType === "expense" ? "1px solid var(--accent-red)" : "1px solid var(--border-subtle)", background: txType === "expense" ? "var(--accent-red-bg)" : "transparent", color: txType === "expense" ? "var(--accent-red)" : "var(--text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                    Fixed Expense
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="e.g. 5000"
+                  value={txAmount}
+                  onChange={(e) => setTxAmount(e.target.value)}
+                  style={{ width: "100%", padding: "12px", borderRadius: 6, border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-primary)", fontSize: 14, outline: "none" }}
+                />
+              </div>
+              <button disabled={isSubmitting} type="submit" className="btn-interactive" style={{ width: "100%", padding: "12px", borderRadius: 6, background: "#191918", color: "#FFF", fontSize: 14, fontWeight: 600, border: "none", marginTop: 8, opacity: isSubmitting ? 0.7 : 1 }}>
+                {isSubmitting ? "Saving..." : "Save Transaction"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

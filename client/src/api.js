@@ -8,6 +8,11 @@ export const api = {
     return res.data;
   },
 
+  addTransaction: async (userId, data) => {
+    const res = await axios.post(`${API_BASE}/user/${userId}/transaction`, data);
+    return res.data;
+  },
+
   analyzeFinancials: async (data) => {
     const res = await axios.post(`${API_BASE}/analyze`, data);
     return res.data;
