@@ -1,3 +1,4 @@
+
 import express from 'express';
 import { getUser } from '../controllers/userController.js';
 import { analyzeFinances, simulateFinances } from '../controllers/financeController.js';
