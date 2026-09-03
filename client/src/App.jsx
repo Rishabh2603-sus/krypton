@@ -18,6 +18,30 @@ import ReactMarkdown from "react-markdown";
 import { api } from "./api";
 import "./App.css";
 
+/* ── Custom Hooks ── */
+function useCountUp(endValue, duration = 600) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      // easeOutQuart
+      const ease = 1 - Math.pow(1 - progress, 4);
+      setValue(Math.floor(ease * endValue));
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        setValue(endValue);
+      }
+    };
+    window.requestAnimationFrame(step);
+  }, [endValue, duration]);
+
+  return value;
+}
+
 /* ── Utility formatters ── */
 const inr = (n) => {
   if (n === null || n === undefined || isNaN(n)) return "₹0";
@@ -45,6 +69,8 @@ const getStatusBadge = (band) => {
    SIDEBAR COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
   const navItems = [
     { id: "dashboard", label: "Overview", icon: "❖" },
     { id: "income", label: "Cash Flow", icon: "↗" },
@@ -62,40 +88,67 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
   return (
     <aside
       style={{
-        width: 230,
+        width: isCollapsed ? 72 : 230,
         flexShrink: 0,
         borderRight: "1px solid var(--border-subtle)",
-        padding: "24px 16px",
+        padding: isCollapsed ? "24px 8px" : "24px 16px",
         background: "#FAF9F6",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
+        transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease",
+        overflow: "hidden"
       }}
     >
       <div>
-        {/* Brand */}
-        <div style={{ padding: "0 8px 24px", display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 6,
-              background: "#191918",
-              color: "#FFFFFF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 700,
-            }}
-          >
-            K
+        {/* Brand & Toggle */}
+        <div style={{ padding: isCollapsed ? "0 4px 24px" : "0 8px 24px", display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 6,
+                background: "#191918",
+                color: "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 700,
+                flexShrink: 0
+              }}
+            >
+              K
+            </div>
+            {!isCollapsed && (
+              <div style={{ whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>Krypton</div>
+                <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Financial Resilience</div>
+              </div>
+            )}
           </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>Krypton</div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Financial Resilience</div>
-          </div>
+          {!isCollapsed && (
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="btn-interactive"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", padding: 4, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+          )}
         </div>
+
+        {/* Collapsed Expand Button */}
+        {isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="btn-interactive"
+            style={{ width: "100%", background: "transparent", border: "none", color: "var(--text-muted)", padding: 8, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, marginBottom: 16 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        )}
 
         {/* Navigation */}
         <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -106,22 +159,25 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
                 key={item.id}
                 onClick={() => onNavClick(item.id)}
                 className="btn-interactive"
+                title={isCollapsed ? item.label : ""}
                 style={{
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: isCollapsed ? "center" : "flex-start",
                   gap: 10,
-                  padding: "9px 12px",
+                  padding: isCollapsed ? "9px 0" : "9px 12px",
                   fontSize: 13,
                   borderRadius: 6,
                   color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
                   background: isActive ? "#EDECE6" : "transparent",
                   fontWeight: isActive ? 600 : 400,
+                  whiteSpace: "nowrap"
                 }}
               >
                 <span style={{ fontSize: 14, color: isActive ? "var(--text-primary)" : "var(--text-muted)" }}>
                   {item.icon}
                 </span>
-                <span>{item.label}</span>
+                {!isCollapsed && <span>{item.label}</span>}
               </div>
             );
           })}
@@ -130,9 +186,11 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
 
       {/* Persona Switcher */}
       <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
-        <div style={{ fontSize: 10.5, color: "var(--text-muted)", padding: "0 8px 8px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
-          Switch Persona
-        </div>
+        {!isCollapsed && (
+          <div style={{ fontSize: 10.5, color: "var(--text-muted)", padding: "0 8px 8px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+            Switch Persona
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           {personas.map((p) => {
             const isSelected = activeUser === p.id;
@@ -141,21 +199,30 @@ function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
                 key={p.id}
                 onClick={() => onUserChange(p.id)}
                 className="btn-interactive"
+                title={isCollapsed ? p.name : ""}
                 style={{
-                  padding: "7px 10px",
+                  padding: isCollapsed ? "9px 0" : "7px 10px",
                   borderRadius: 6,
                   fontSize: 12.5,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: isCollapsed ? "center" : "space-between",
                   color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
                   background: isSelected ? "var(--bg-card)" : "transparent",
                   border: isSelected ? "1px solid var(--border-subtle)" : "1px solid transparent",
                   fontWeight: isSelected ? 600 : 400,
                 }}
               >
-                <span>{p.name}</span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{p.role}</span>
+                {isCollapsed ? (
+                  <div style={{ width: 20, height: 20, borderRadius: 10, background: isSelected ? "#191918" : "#D5D3CB", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>
+                    {p.name.charAt(0)}
+                  </div>
+                ) : (
+                  <>
+                    <span>{p.name}</span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{p.role}</span>
+                  </>
+                )}
               </div>
             );
           })}
@@ -253,9 +320,12 @@ export default function App() {
         resilienceScore: analysis.resilience.score,
       };
 
-      const res = await api.chatWithAI(metrics, [...chatHistory, userMessage]);
+      const res = await api.chatWithAI(metrics, [...chatHistory, userMessage], activeUserId);
       if (res.success) {
         setChatHistory((prev) => [...prev, { role: "model", parts: [{ text: res.data }] }]);
+        if (res.actionExecuted) {
+           loadUser(activeUserId);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -263,6 +333,16 @@ export default function App() {
     }
     setIsTyping(false);
   };
+
+  const targetSafeToSpend = analysis?.safeToSpend?.amount || 0;
+  const targetSavings = user?.currentSavings || 0;
+  const targetAvgIncome = analysis?.incomeAnalysis?.average || 0;
+  const targetObligations = (user?.essentialExpenses || 0) + (user?.monthlyDebtPayment || 0);
+
+  const animatedSafeToSpend = useCountUp(targetSafeToSpend);
+  const animatedSavings = useCountUp(targetSavings);
+  const animatedAvgIncome = useCountUp(targetAvgIncome);
+  const animatedObligations = useCountUp(targetObligations);
 
   if (loading || !user || !analysis) {
     return (
@@ -330,10 +410,16 @@ export default function App() {
               {user.occupation} · {user.incomeType} income
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, background: statusBadge.bg, color: statusBadge.color, border: `1px solid ${statusBadge.border}` }}>
               ● {statusBadge.label} ({resilience.score}/100)
             </span>
+            <button
+              className="btn-interactive"
+              style={{ background: "transparent", border: "1px solid var(--border-light)", color: "var(--text-primary)", width: 32, height: 32, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </button>
           </div>
         </header>
 
@@ -347,25 +433,25 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
               <div className="minimal-card" style={{ padding: "18px 20px" }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>Safe to Spend</div>
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(safeToSpend.amount)}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(animatedSafeToSpend)}</div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>Discretionary ceiling</div>
               </div>
 
               <div className="minimal-card" style={{ padding: "18px 20px" }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>Liquid Savings</div>
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(user.currentSavings)}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(animatedSavings)}</div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>{coverageMonths} months essentials</div>
               </div>
 
               <div className="minimal-card" style={{ padding: "18px 20px" }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>Monthly Earnings</div>
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(avgIncome)}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(animatedAvgIncome)}</div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>{(incomeAnalysis.volatility * 100).toFixed(0)}% volatility</div>
               </div>
 
               <div className="minimal-card" style={{ padding: "18px 20px" }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>Fixed Commitments</div>
-                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(monthlyObligations)}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "-0.01em" }}>{inr(animatedObligations)}</div>
                 <div style={{ fontSize: 11.5, color: netSurplus >= 0 ? "var(--accent-green)" : "var(--accent-red)", marginTop: 4 }}>
                   {netSurplus >= 0 ? `+${inr(netSurplus)} surplus` : `${inr(netSurplus)} deficit`}
                 </div>

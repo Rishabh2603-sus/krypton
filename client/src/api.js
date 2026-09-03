@@ -23,8 +23,8 @@ export const api = {
     return res.data;
   },
 
-  chatWithAI: async (financialMetrics, messageHistory) => {
-    const res = await axios.post(`${API_BASE}/ai/chat`, { financialMetrics, messageHistory });
+  chatWithAI: async (financialMetrics, messageHistory, userId) => {
+    const res = await axios.post(`${API_BASE}/ai/chat`, { financialMetrics, messageHistory, userId });
     return res.data;
   }
 };

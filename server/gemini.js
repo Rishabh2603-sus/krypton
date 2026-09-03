@@ -63,7 +63,9 @@ export async function getFinancialAdvice(financialMetrics) {
   };
 }
 
-export async function chatWithAssistant(financialMetrics, messageHistory) {
+import User from './models/User.js';
+
+export async function chatWithAssistant(financialMetrics, messageHistory, userId) {
   const CHAT_PROMPT = `
 You are the Krypton Smart Financial Assistant, an AI-powered personal financial decision assistant.
 Analyze the user's financial information (provided below). Based on this information, provide personalized financial guidance through natural-language conversations.
@@ -87,7 +89,6 @@ ${JSON.stringify(financialMetrics, null, 2)}
     }
   ];
   
-  // Add the ongoing conversation history (except the very last message)
   if (messageHistory && messageHistory.length > 1) {
     for (let i = 0; i < messageHistory.length - 1; i++) {
       formattedHistory.push(messageHistory[i]);
@@ -96,20 +97,61 @@ ${JSON.stringify(financialMetrics, null, 2)}
 
   const lastMessage = messageHistory[messageHistory.length - 1].parts[0].text;
 
+  const tools = [{
+    functionDeclarations: [
+      {
+        name: "update_financial_goal",
+        description: "Update the user's main financial goal when they ask to change it. Valid goals are: 'emergency_fund', 'investment', or 'debt_repayment'.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            goal: {
+              type: "STRING",
+              description: "The new financial goal",
+            },
+          },
+          required: ["goal"],
+        },
+      }
+    ]
+  }];
+
   for (const modelName of MODEL_CHAIN) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({ model: modelName, tools });
       const chat = model.startChat({
         history: formattedHistory
       });
 
       const result = await chat.sendMessage(lastMessage);
       const response = await result.response;
-      return response.text();
+      
+      const functionCalls = response.functionCalls();
+      
+      if (functionCalls && functionCalls.length > 0) {
+        const call = functionCalls[0];
+        if (call.name === "update_financial_goal" && userId) {
+          const { goal } = call.args;
+          
+          await User.findOneAndUpdate({ userId }, { financialGoal: goal });
+          
+          const result2 = await chat.sendMessage([{
+            functionResponse: {
+              name: "update_financial_goal",
+              response: { success: true, newGoal: goal }
+            }
+          }]);
+          
+          return { text: result2.response.text(), actionExecuted: true };
+        }
+      }
+
+      return { text: response.text(), actionExecuted: false };
     } catch (error) {
       console.warn(`[chatWithAssistant] Model ${modelName} failed (${error.status || error.message}). Trying next fallback model...`);
     }
   }
 
-  return "I'm having trouble connecting to my AI brain right now. Please check your API key or try again later.";
+  return { text: "I'm having trouble connecting to my AI brain right now. Please check your API key or try again later.", actionExecuted: false };
 }
+

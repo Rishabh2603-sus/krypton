@@ -28,7 +28,7 @@ export const getAdvice = async (req, res) => {
 
 export const chatWithAI = async (req, res) => {
   try {
-    const { financialMetrics, messageHistory } = req.body;
+    const { financialMetrics, messageHistory, userId } = req.body;
     
     if (!financialMetrics || !messageHistory) {
       return res.status(400).json({
@@ -37,11 +37,12 @@ export const chatWithAI = async (req, res) => {
       });
     }
 
-    const responseText = await chatWithAssistant(financialMetrics, messageHistory);
+    const aiResponse = await chatWithAssistant(financialMetrics, messageHistory, userId);
 
     res.json({
       success: true,
-      data: responseText
+      data: aiResponse.text,
+      actionExecuted: aiResponse.actionExecuted
     });
   } catch (error) {
     console.error("Gemini AI Chat Error:", error);

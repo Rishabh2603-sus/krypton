@@ -31,6 +31,10 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-app);
@@ -57,24 +61,26 @@ body {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-subtle);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 .minimal-card:hover {
-  border-color: #DBD8CE;
-  box-shadow: var(--shadow-card);
+  border-color: #D1CEC2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
+  transform: translateY(-2px);
 }
 
 /* Interactive transitions */
 .btn-interactive {
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
 .btn-interactive:hover {
   background-color: var(--bg-subtle);
+  transform: translateY(-1px);
 }
 .btn-interactive:active {
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 
 /* Smooth fade in */
