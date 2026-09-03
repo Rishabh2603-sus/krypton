@@ -25,6 +25,16 @@ app.use(express.json());
 // API Routes
 app.use("/api", apiRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Krypton API running at http://localhost:${PORT}`);
+// Root route so you don't get "Cannot GET /" if you visit the backend URL
+app.get("/", (req, res) => {
+  res.send("Krypton API is running! 🚀 Visit the frontend app to use it.");
 });
+
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`Krypton API running at http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel Serverless Functions
+export default app;
