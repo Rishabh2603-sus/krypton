@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
 
 const SYSTEM_PROMPT = `
 You are Krypton, an AI financial resilience assistant.
@@ -54,5 +54,51 @@ export async function getFinancialAdvice(financialMetrics) {
       bufferAdvice: "Keep a steady emergency buffer.",
       simpleExplanation: "AI explanations are currently offline, but your core metrics are still valid."
     };
+  }
+}
+
+export async function chatWithAssistant(financialMetrics, messageHistory) {
+  try {
+    const CHAT_PROMPT = `
+You are the Krypton Smart Financial Assistant, an AI-powered personal financial decision assistant.
+Analyze the user's financial information (provided below). Based on this information, provide personalized financial guidance through natural-language conversations.
+When answering questions like "Can I afford this phone?", "Can I spend ₹5,000 right now?", "Can I apply for a loan?", or "How much should I save this month?", consider their OVERALL financial condition (not just current balance).
+Explain the reasoning behind your recommendation.
+Highlight possible risks (upcoming bills, low savings, high expenses, unstable income).
+Be helpful, empathetic, and financially prudent. Give clear "Yes", "No", or "Yes, but..." style guidance before explaining.
+
+Financial Context of the user:
+${JSON.stringify(financialMetrics, null, 2)}
+`;
+
+    const formattedHistory = [
+      {
+        role: "user",
+        parts: [{ text: CHAT_PROMPT }]
+      },
+      {
+        role: "model",
+        parts: [{ text: "Understood. I am ready to act as the Krypton Smart Financial Assistant and provide personalized, contextual advice." }]
+      }
+    ];
+    
+    // Add the ongoing conversation history (except the very last message)
+    if (messageHistory && messageHistory.length > 1) {
+      for (let i = 0; i < messageHistory.length - 1; i++) {
+        formattedHistory.push(messageHistory[i]);
+      }
+    }
+
+    const chat = model.startChat({
+      history: formattedHistory
+    });
+
+    const lastMessage = messageHistory[messageHistory.length - 1].parts[0].text;
+    const result = await chat.sendMessage(lastMessage);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Gemini AI Chat Error:", error);
+    return "I'm having trouble connecting to my AI brain right now. Please check your API key or try again later.";
   }
 }

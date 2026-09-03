@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import ReactMarkdown from "react-markdown";
 import { api } from "./api";
 import "./App.css";
 
@@ -38,8 +39,14 @@ const priorityTone = {
 
 /* ── sub-components ── */
 
-function Sidebar({ activeUser, onUserChange }) {
-  const navItems = ["Dashboard", "Income", "Forecast", "Simulator", "Coach"];
+function Sidebar({ activeUser, onUserChange, onNavClick, activeSection }) {
+  const navItems = [
+    { id: "dashboard", label: "Dashboard" },
+    { id: "income", label: "Income" },
+    { id: "forecast", label: "Forecast" },
+    { id: "simulator", label: "Simulator" },
+    { id: "coach", label: "Coach" },
+  ];
   const users = [
     { id: "ravi", label: "Ravi – Delivery" },
     { id: "priya", label: "Priya – Freelance" },
@@ -72,20 +79,21 @@ function Sidebar({ activeUser, onUserChange }) {
       </div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 32 }}>
-        {navItems.map((item, i) => (
+        {navItems.map((item) => (
           <div
-            key={item}
+            key={item.id}
+            onClick={() => onNavClick && onNavClick(item.id)}
             style={{
               padding: "8px 10px",
               fontSize: 13.5,
               borderRadius: 6,
               cursor: "pointer",
-              color: i === 0 ? "#1A1A17" : "#6B6A63",
-              background: i === 0 ? "#EFEDE4" : "transparent",
-              fontWeight: i === 0 ? 500 : 400,
+              color: activeSection === item.id ? "#1A1A17" : "#6B6A63",
+              background: activeSection === item.id ? "#EFEDE4" : "transparent",
+              fontWeight: activeSection === item.id ? 500 : 400,
             }}
           >
-            {item}
+            {item.label}
           </div>
         ))}
       </nav>
@@ -306,24 +314,51 @@ export default function App() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Nav Refs
+  const dashboardRef = useRef(null);
+  const incomeRef = useRef(null);
+  const forecastRef = useRef(null);
+  const simulatorRef = useRef(null);
+  const coachRef = useRef(null);
+  const [activeSection, setActiveSection] = useState("dashboard");
+
   // Simulator
   const [simResult, setSimResult] = useState(null);
   const [simLoading, setSimLoading] = useState(false);
   const [simPercent, setSimPercent] = useState(null);
 
-  // Coach
-  const [advice, setAdvice] = useState(null);
-  const [adviceLoading, setAdviceLoading] = useState(false);
+  // Coach Chat
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef(null);
+
+  // Auto scroll to bottom of chat
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatHistory, isTyping]);
 
   useEffect(() => {
     loadUser(activeUserId);
   }, [activeUserId]);
 
+  const scrollTo = (id) => {
+    setActiveSection(id);
+    const refs = { dashboard: dashboardRef, income: incomeRef, forecast: forecastRef, simulator: simulatorRef, coach: coachRef };
+    if (refs[id]?.current) {
+      refs[id].current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   const loadUser = async (userId) => {
     setLoading(true);
     setSimResult(null);
     setSimPercent(null);
-    setAdvice(null);
+    setChatHistory([
+      { role: "model", parts: [{ text: "Hi there! I'm your Krypton Financial Assistant. Ask me anything about your budget, what you can afford, or your financial decisions." }] }
+    ]);
     try {
       const demoRes = await api.getDemoUser(userId);
       if (demoRes.success) {
@@ -351,9 +386,13 @@ export default function App() {
     setSimLoading(false);
   };
 
-  const handleGetAdvice = async () => {
-    if (!analysis || !user) return;
-    setAdviceLoading(true);
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || !analysis || !user) return;
+    const newMsg = { role: "user", parts: [{ text: chatInput }] };
+    setChatHistory((prev) => [...prev, newMsg]);
+    setChatInput("");
+    setIsTyping(true);
+
     try {
       const metrics = {
         incomeRange: analysis.forecast,
@@ -363,12 +402,18 @@ export default function App() {
         incomeVolatility: analysis.incomeAnalysis.volatility,
         resilienceScore: analysis.resilience.score,
       };
-      const res = await api.getAIAdvice(metrics);
-      if (res.success) setAdvice(res.data);
+      
+      const res = await api.chatWithAI(metrics, [...chatHistory, newMsg]);
+      if (res.success) {
+        setChatHistory((prev) => [...prev, { role: "model", parts: [{ text: res.data }] }]);
+      } else {
+        throw new Error("API Error");
+      }
     } catch (err) {
       console.error(err);
+      setChatHistory((prev) => [...prev, { role: "model", parts: [{ text: "Sorry, I'm having trouble responding right now. Check your API key or network connection." }] }]);
     }
-    setAdviceLoading(false);
+    setIsTyping(false);
   };
 
   /* ── loading state ── */
@@ -416,7 +461,7 @@ export default function App() {
         color: "#1A1A17",
       }}
     >
-      <Sidebar activeUser={activeUserId} onUserChange={setActiveUserId} />
+      <Sidebar activeUser={activeUserId} onUserChange={setActiveUserId} onNavClick={scrollTo} activeSection={activeSection} />
 
       <div style={{ flex: 1, padding: "24px 32px", maxWidth: 920, overflowY: "auto" }}>
         {/* Header */}
@@ -436,7 +481,7 @@ export default function App() {
         </div>
 
         {/* ── Metric cards ── */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        <div ref={dashboardRef} style={{ display: "flex", gap: 12, marginBottom: 24 }}>
           <MetricCard label="Current savings" value={inr(user.currentSavings)} />
           <MetricCard
             label="Resilience score"
@@ -458,6 +503,7 @@ export default function App() {
 
         {/* ── Income chart ── */}
         <div
+          ref={incomeRef}
           style={{
             background: "#FBFAF6",
             border: "1px solid #E4E1D6",
@@ -524,7 +570,7 @@ export default function App() {
         </div>
 
         {/* ── Two columns: risk factors + recommendations ── */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
+        <div ref={forecastRef} style={{ display: "flex", gap: 20, marginBottom: 24 }}>
           <div
             style={{
               flex: 1,
@@ -565,6 +611,7 @@ export default function App() {
 
         {/* ── Simulator ── */}
         <div
+          ref={simulatorRef}
           style={{
             background: "#FBFAF6",
             border: "1px solid #E4E1D6",
@@ -659,79 +706,112 @@ export default function App() {
           )}
         </div>
 
-        {/* ── AI Coach ── */}
+        {/* ── AI Coach Chat ── */}
         <div
+          ref={coachRef}
           style={{
             background: "#FBFAF6",
             border: "1px solid #E4E1D6",
             borderRadius: 4,
-            padding: "20px 24px",
+            padding: "0",
             marginBottom: 24,
+            display: "flex",
+            flexDirection: "column",
+            height: 400,
+            overflow: "hidden"
           }}
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
+              padding: "16px 24px",
+              borderBottom: "1px solid #E4E1D6",
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#1A1A17"
             }}
           >
-            <div style={{ fontSize: 13, color: "#8A887F" }}>🧠 Krypton Coach</div>
-            {!advice && (
-              <button
-                onClick={handleGetAdvice}
-                disabled={adviceLoading}
+            🧠 Krypton Smart Assistant
+          </div>
+          
+          <div style={{ flex: 1, padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+            {chatHistory.map((msg, i) => (
+              <div
+                key={i}
                 style={{
-                  padding: "6px 14px",
-                  fontSize: 12.5,
-                  border: "1px solid #E4E1D6",
-                  background: "#FBFAF6",
-                  color: "#4A4941",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
+                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "80%",
+                  background: msg.role === "user" ? "#1A1A17" : "#EFEDE4",
+                  color: msg.role === "user" ? "#FBFAF6" : "#1A1A17",
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  fontSize: 13.5,
+                  lineHeight: 1.5
                 }}
               >
-                {adviceLoading ? "Thinking…" : "Get AI advice"}
-              </button>
-            )}
-          </div>
-          {!advice && !adviceLoading && (
-            <div style={{ fontSize: 13, color: "#8A887F" }}>
-              Click "Get AI advice" for personalised guidance from the Krypton Coach.
-            </div>
-          )}
-          {advice && (
-            <div>
-              <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{advice.summary}</p>
-              <p style={{ fontSize: 13, color: "#633806", marginBottom: 16 }}>{advice.risk}</p>
-              <div style={{ borderTop: "1px solid #E4E1D6", paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: "#8A887F", marginBottom: 8 }}>
-                  Recommendations
+                <div style={{ wordBreak: "break-word" }}>
+                  {msg.role === "model" ? (
+                    <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                  ) : (
+                    msg.parts[0].text
+                  )}
                 </div>
-                <ul style={{ paddingLeft: 18, margin: 0 }}>
-                  {advice.recommendations?.map((r, i) => (
-                    <li key={i} style={{ fontSize: 13.5, marginBottom: 6, lineHeight: 1.5 }}>
-                      {r}
-                    </li>
-                  ))}
-                </ul>
               </div>
+            ))}
+            {isTyping && (
               <div
                 style={{
-                  marginTop: 16,
-                  padding: "12px 16px",
+                  alignSelf: "flex-start",
                   background: "#EFEDE4",
-                  borderRadius: 4,
-                  fontSize: 13,
-                  lineHeight: 1.5,
+                  color: "#8A887F",
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  fontSize: 13.5,
+                  fontStyle: "italic"
                 }}
               >
-                <strong style={{ color: "#4A4941" }}>Buffer advice:</strong> {advice.bufferAdvice}
+                Typing...
               </div>
-            </div>
-          )}
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div style={{ padding: "16px 24px", borderTop: "1px solid #E4E1D6", display: "flex", gap: 12 }}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder="E.g., Can I afford to buy this phone?"
+              style={{
+                flex: 1,
+                padding: "10px 14px",
+                border: "1px solid #E4E1D6",
+                borderRadius: 4,
+                fontSize: 13.5,
+                background: "#FBFAF6",
+                color: "#1A1A17",
+                outline: "none",
+                fontFamily: "inherit"
+              }}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={isTyping || !chatInput.trim()}
+              style={{
+                padding: "0 20px",
+                background: isTyping || !chatInput.trim() ? "#E4E1D6" : "#D85A30",
+                color: isTyping || !chatInput.trim() ? "#8A887F" : "#FBFAF6",
+                border: "none",
+                borderRadius: 4,
+                cursor: isTyping || !chatInput.trim() ? "not-allowed" : "pointer",
+                fontWeight: 500,
+                fontSize: 13,
+                fontFamily: "inherit"
+              }}
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
     </div>

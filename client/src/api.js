@@ -21,5 +21,10 @@ export const api = {
   getAIAdvice: async (financialMetrics) => {
     const res = await axios.post(`${API_BASE}/ai/advice`, { financialMetrics });
     return res.data;
+  },
+
+  chatWithAI: async (financialMetrics, messageHistory) => {
+    const res = await axios.post(`${API_BASE}/ai/chat`, { financialMetrics, messageHistory });
+    return res.data;
   }
 };

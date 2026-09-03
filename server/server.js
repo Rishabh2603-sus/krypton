@@ -11,7 +11,7 @@ import {
 
 import demoData from "./demoData.json" with { type: "json" };
 
-import { getFinancialAdvice } from "./gemini.js";
+import { getFinancialAdvice, chatWithAssistant } from "./gemini.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -123,6 +123,32 @@ app.post("/api/ai/advice", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Unable to generate AI advice"
+    });
+  }
+});
+
+app.post("/api/ai/chat", async (req, res) => {
+  try {
+    const { financialMetrics, messageHistory } = req.body;
+
+    if (!financialMetrics || !messageHistory) {
+      return res.status(400).json({
+        success: false,
+        message: "financialMetrics and messageHistory are required"
+      });
+    }
+
+    const responseText = await chatWithAssistant(financialMetrics, messageHistory);
+
+    res.json({
+      success: true,
+      data: responseText
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Unable to generate AI chat response"
     });
   }
 });
