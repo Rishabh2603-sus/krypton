@@ -12,7 +12,14 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:5174",
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,        // Set this on Render to your Vercel URL
+  ].filter(Boolean),
+  credentials: true,
+}));
 app.use(express.json());
 
 // API Routes
