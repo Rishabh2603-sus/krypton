@@ -4,7 +4,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
-const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+const MODEL_CHAIN = [
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+  "gemini-2.5-flash",
+  "gemini-1.5-flash"
+];
 
 const SYSTEM_PROMPT = `
 You are Krypton, an AI financial resilience assistant.
@@ -27,39 +34,37 @@ Return ONLY a valid JSON object matching this structure:
 `;
 
 export async function getFinancialAdvice(financialMetrics) {
-  try {
-    const prompt = `${SYSTEM_PROMPT}\n\nFinancial Metrics:\n${JSON.stringify(financialMetrics, null, 2)}`;
-    
-    // In a real application, you might use responseSchema if using gemini-1.5-pro
-    // We'll parse the JSON from the text for robustness across models
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Clean up markdown block if present
-    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    return JSON.parse(cleanedText);
-  } catch (error) {
-    console.error("Gemini AI Error:", error);
-    // Fallback recommendation engine
-    return {
-      summary: "We analyzed your financial resilience based on your income patterns.",
-      risk: "Unable to calculate detailed risk at this moment.",
-      recommendations: [
-        "Monitor your essential expenses.",
-        "Maintain an emergency buffer.",
-        "Adjust spending based on income stability."
-      ],
-      bufferAdvice: "Keep a steady emergency buffer.",
-      simpleExplanation: "AI explanations are currently offline, but your core metrics are still valid."
-    };
+  const prompt = `${SYSTEM_PROMPT}\n\nFinancial Metrics:\n${JSON.stringify(financialMetrics, null, 2)}`;
+  
+  for (const modelName of MODEL_CHAIN) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanedText);
+    } catch (error) {
+      console.warn(`[getFinancialAdvice] Model ${modelName} failed (${error.message}). Trying next model in chain...`);
+    }
   }
+
+  // Fallback recommendation engine if all models fail
+  return {
+    summary: "We analyzed your financial resilience based on your income patterns.",
+    risk: "Unable to calculate detailed risk at this moment.",
+    recommendations: [
+      "Monitor your essential expenses.",
+      "Maintain an emergency buffer.",
+      "Adjust spending based on income stability."
+    ],
+    bufferAdvice: "Keep a steady emergency buffer.",
+    simpleExplanation: "AI explanations are currently offline, but your core metrics are still valid."
+  };
 }
 
 export async function chatWithAssistant(financialMetrics, messageHistory) {
-  try {
-    const CHAT_PROMPT = `
+  const CHAT_PROMPT = `
 You are the Krypton Smart Financial Assistant, an AI-powered personal financial decision assistant.
 Analyze the user's financial information (provided below). Based on this information, provide personalized financial guidance through natural-language conversations.
 When answering questions like "Can I afford this phone?", "Can I spend ₹5,000 right now?", "Can I apply for a loan?", or "How much should I save this month?", consider their OVERALL financial condition (not just current balance).
@@ -71,34 +76,40 @@ Financial Context of the user:
 ${JSON.stringify(financialMetrics, null, 2)}
 `;
 
-    const formattedHistory = [
-      {
-        role: "user",
-        parts: [{ text: CHAT_PROMPT }]
-      },
-      {
-        role: "model",
-        parts: [{ text: "Understood. I am ready to act as the Krypton Smart Financial Assistant and provide personalized, contextual advice." }]
-      }
-    ];
-    
-    // Add the ongoing conversation history (except the very last message)
-    if (messageHistory && messageHistory.length > 1) {
-      for (let i = 0; i < messageHistory.length - 1; i++) {
-        formattedHistory.push(messageHistory[i]);
-      }
+  const formattedHistory = [
+    {
+      role: "user",
+      parts: [{ text: CHAT_PROMPT }]
+    },
+    {
+      role: "model",
+      parts: [{ text: "Understood. I am ready to act as the Krypton Smart Financial Assistant and provide personalized, contextual advice." }]
     }
-
-    const chat = model.startChat({
-      history: formattedHistory
-    });
-
-    const lastMessage = messageHistory[messageHistory.length - 1].parts[0].text;
-    const result = await chat.sendMessage(lastMessage);
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Gemini AI Chat Error:", error);
-    return "I'm having trouble connecting to my AI brain right now. Please check your API key or try again later.";
+  ];
+  
+  // Add the ongoing conversation history (except the very last message)
+  if (messageHistory && messageHistory.length > 1) {
+    for (let i = 0; i < messageHistory.length - 1; i++) {
+      formattedHistory.push(messageHistory[i]);
+    }
   }
+
+  const lastMessage = messageHistory[messageHistory.length - 1].parts[0].text;
+
+  for (const modelName of MODEL_CHAIN) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const chat = model.startChat({
+        history: formattedHistory
+      });
+
+      const result = await chat.sendMessage(lastMessage);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.warn(`[chatWithAssistant] Model ${modelName} failed (${error.status || error.message}). Trying next fallback model...`);
+    }
+  }
+
+  return "I'm having trouble connecting to my AI brain right now. Please check your API key or try again later.";
 }
