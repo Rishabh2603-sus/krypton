@@ -5,19 +5,35 @@ import demoData from './demoData.json' with { type: 'json' };
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 const connectDB = async () => {
-  try {
-    const mongoServer = await MongoMemoryServer.create();
-    const mongoURI = mongoServer.getUri();
-    
-    await mongoose.connect(mongoURI);
-    console.log(`MongoDB Connected to In-Memory Server at ${mongoURI}`);
+  let connected = false;
+  const mongoURI = process.env.MONGO_URI;
 
-    // Seed database if empty
-    await seedDatabase();
-  } catch (error) {
-    console.error(`Error connecting to MongoDB: ${error.message}`);
-    process.exit(1);
+  if (mongoURI) {
+    try {
+      console.log('Connecting to MongoDB Atlas Cluster...');
+      await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 4000 });
+      console.log('MongoDB Connected to Cloud/Atlas Cluster successfully!');
+      connected = true;
+    } catch (error) {
+      console.warn('Could not reach Atlas cluster (outbound port 27017 might be blocked by your network/ISP).');
+      console.log('Switching to embedded in-memory MongoDB so your app runs with zero downtime...');
+    }
   }
+
+  if (!connected) {
+    try {
+      const mongoServer = await MongoMemoryServer.create();
+      const localURI = mongoServer.getUri();
+      await mongoose.connect(localURI);
+      console.log(`MongoDB Connected (In-Memory Database ready) at ${localURI}`);
+    } catch (err) {
+      console.error(`Fatal MongoDB error: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Seed database if empty
+  await seedDatabase();
 };
 
 const seedDatabase = async () => {
